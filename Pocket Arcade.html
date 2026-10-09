@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pocket Arcade</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#ECE8F7;--ink:#231B3A;--card:#fff;--line:#cfc7e8;--c1:#E8454B;--c2:#F2A900;--c3:#12A594;--c4:#6A4CFF;--screen:#150F2A;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#181228;--ink:#F1ECFF;--card:#251C3E;--line:#3a2f5c}}
+:root[data-theme="dark"]{--bg:#181228;--ink:#F1ECFF;--card:#251C3E;--line:#3a2f5c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+main{max-width:560px;margin:0 auto;padding:24px 16px 40px}
+h1,h2,.px{font-family:"Press Start 2P",ui-monospace,Menlo,monospace;font-weight:400;line-height:1.4}
+h1{font-size:clamp(20px,6vw,30px);margin:8px 0 6px}
+.sub{margin:0 0 24px;opacity:.75}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card{all:unset;box-sizing:border-box;cursor:pointer;background:var(--card);border:3px solid var(--ink);border-radius:6px;box-shadow:5px 5px 0 var(--ink);overflow:hidden;display:block}
+.card:focus-visible,button:focus-visible{outline:3px solid var(--c4);outline-offset:2px}
+.card:active{transform:translate(3px,3px);box-shadow:2px 2px 0 var(--ink)}
+.card .top{height:84px;display:grid;place-items:center;font-size:40px;border-bottom:3px solid var(--ink)}
+.card .bd{padding:12px}
+.card b{display:block;font:12px/1.4 "Press Start 2P",ui-monospace,monospace}
+.card small{display:block;margin-top:8px;opacity:.75}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+h2{font-size:14px;margin:0}
+.btn{font:11px/1 "Press Start 2P",ui-monospace,monospace;background:var(--card);color:var(--ink);border:3px solid var(--ink);border-radius:6px;padding:10px 12px;cursor:pointer;box-shadow:3px 3px 0 var(--ink)}
+.btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.stats{display:flex;gap:18px;font:11px/1.6 "Press Start 2P",ui-monospace,monospace;margin-bottom:10px}
+.cab{background:var(--screen);border:3px solid var(--ink);border-radius:8px;padding:10px;display:grid;place-items:center;min-height:200px}
+canvas{display:block;width:min(100%,360px);height:auto;touch-action:none;image-rendering:pixelated;background:#150F2A;border-radius:4px}
+#msg{min-height:1.5em;margin:12px 0 4px;font-weight:600}
+#hint{margin:0;opacity:.7;font-size:14px}
+#pad{display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(2,48px);gap:6px;justify-content:center;margin-top:14px}
+#pad button{font-size:20px;background:var(--card);color:var(--ink);border:3px solid var(--ink);border-radius:6px;cursor:pointer}
+#pad [data-d="u"]{grid-column:2}#pad [data-d="l"]{grid-row:2;grid-column:1}#pad [data-d="d"]{grid-row:2;grid-column:2}#pad [data-d="r"]{grid-row:2;grid-column:3}
+.mem{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:min(100%,340px)}
+.mem button{aspect-ratio:1;font-size:32px;border:3px solid #F1ECFF;border-radius:6px;background:var(--c4);color:#fff;cursor:pointer;padding:0}
+.mem button.up{background:#fff}.mem button.ok{background:var(--c3);opacity:.85}
+.ttt{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:min(100%,300px)}
+.ttt button{aspect-ratio:1;font:36px "Press Start 2P",ui-monospace,monospace;border:3px solid #F1ECFF;border-radius:6px;background:#241a45;color:#fff;cursor:pointer;padding:0}
+.ttt button.x{color:var(--c2)}.ttt button.o{color:#5fe0cf}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head>
+<body><main>
+<section id="menu">
+  <h1>Pocket Arcade</h1>
+  <p class="sub">Four games, no coins needed. Pick one to play.</p>
+  <div class="grid" id="cards"></div>
+</section>
+<section id="stage" hidden>
+  <div class="bar"><button class="btn" id="back">Menu</button><h2 id="title"></h2><button class="btn" id="again">Restart</button></div>
+  <div class="stats"><span>Score <span id="score">0</span></span><span>Best <span id="best">-</span></span></div>
+  <div class="cab" id="view"></div>
+  <div id="pad" hidden><button data-d="u" aria-label="Up">▲</button><button data-d="l" aria-label="Left">◀</button><button data-d="d" aria-label="Down">▼</button><button data-d="r" aria-label="Right">▶</button></div>
+  <p id="msg" role="status"></p>
+  <p id="hint"></p>
+</section>
+</main>
+<script>
+const $=s=>document.querySelector(s),view=$('#view'),sc=$('#score'),bs=$('#best'),msg=$('#msg'),pad=$('#pad');
+const rand=n=>Math.random()*n|0;
+const store={get(k){try{return +localStorage.getItem('arc_'+k)||0}catch(e){return 0}},set(k,v){try{localStorage.setItem('arc_'+k,v)}catch(e){}}};
+let cur=null,offs=[];
+const on=(t,e,f,o)=>{t.addEventListener(e,f,o);offs.push(()=>t.removeEventListener(e,f,o))};
+const later=(f,ms)=>{const t=setTimeout(f,ms);offs.push(()=>clearTimeout(t));return t};
+const clean=()=>{offs.forEach(f=>f());offs=[]};
+const setScore=n=>sc.textContent=n;
+const submit=n=>{const b=store.get(cur.id);if(n>0&&(!b||(cur.low?n<b:n>b))){store.set(cur.id,n);bs.textContent=n}};
+const mk=(w,h)=>{view.innerHTML='';const c=document.createElement('canvas');c.width=w;c.height=h;view.appendChild(c);return c};
+const spot=(cv,e)=>{const r=cv.getBoundingClientRect(),p=e.touches?e.touches[0]:e;return[(p.clientX-r.left)*cv.width/r.width,(p.clientY-r.top)*cv.height/r.height]};
+
+const G={
+snake:{name:'Snake',icon:'🐍',color:'--c3',hint:'Arrow keys or WASD, swipe on the screen, or use the pad. Space restarts.',start(){
+  const N=20,S=18,cv=mk(360,360),x=cv.getContext('2d');
+  let s,d,q,f,n,over,speed,t;
+  const place=()=>{do{f=[rand(N),rand(N)]}while(s.some(p=>p[0]==f[0]&&p[1]==f[1]))};
+  const turn=(dx,dy)=>{const l=q.length?q[q.length-1]:d;if(q.length<3&&!(dx===-l[0]&&dy===-l[1])&&!(dx===l[0]&&dy===l[1]))q.push([dx,dy])};
+  const draw=()=>{x.fillStyle='#150F2A';x.fillRect(0,0,360,360);x.fillStyle='#E8454B';x.fillRect(f[0]*S+2,f[1]*S+2,S-4,S-4);
+    s.forEach((p,i)=>{x.fillStyle=i?'#12A594':'#5fe0cf';x.fillRect(p[0]*S+1,p[1]*S+1,S-2,S-2)})};
+  const step=()=>{d=q.shift()||d;const h=[s[0][0]+d[0],s[0][1]+d[1]];
+    if(h[0]<0||h[1]<0||h[0]>=N||h[1]>=N||s.slice(0,-1).some(p=>p[0]==h[0]&&p[1]==h[1])){over=true;msg.textContent='Game over. Tap the screen or press Space to play again.';submit(n);return}
+    s.unshift(h);if(h[0]==f[0]&&h[1]==f[1]){n++;setScore(n);speed=Math.max(55,speed-2);place()}else s.pop()};
+  const loop=()=>{step();draw();if(!over)t=later(loop,speed)};
+  const reset=()=>{clearTimeout(t);s=[[10,10],[9,10],[8,10]];d=[1,0];q=[];n=0;over=false;speed=120;setScore(0);msg.textContent='';place();draw();t=later(loop,speed)};
+  cur.dir=k=>{const m={u:[0,-1],d:[0,1],l:[-1,0],r:[1,0]}[k];turn(...m)};
+  on(document,'keydown',e=>{const m={ArrowUp:'u',w:'u',ArrowDown:'d',s:'d',ArrowLeft:'l',a:'l',ArrowRight:'r',d:'r'}[e.key];
+    if(m){e.preventDefault();cur.dir(m)}else if(e.key===' '){e.preventDefault();if(over)reset()}});
+  let sx,sy;
+  on(cv,'touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;if(over)reset()},{passive:true});
+  on(cv,'touchend',e=>{const t0=e.changedTouches[0],dx=t0.clientX-sx,dy=t0.clientY-sy;if(Math.max(Math.abs(dx),Math.abs(dy))<20)return;
+    cur.dir(Math.abs(dx)>Math.abs(dy)?(dx>0?'r':'l'):(dy>0?'d':'u'))});
+  on(cv,'click',()=>{if(over)reset()});
+  reset();
+}},
+breakout:{name:'Breakout',icon:'🧱',color:'--c1',hint:'Move the paddle with the mouse, your finger, or the left and right arrows. Click, tap or press Space to launch.',start(){
+  const W=360,H=420,cv=mk(W,H),x=cv.getContext('2d'),PW=64,PY=398,R=6,cols=['#E8454B','#F2A900','#F2A900','#12A594','#6A4CFF'];
+  let px,bx,by,vx,vy,lives,n,run,lvl,br,over,raf,L=false,Rt=false;
+  const build=()=>{br=[];for(let r=0;r<5;r++)for(let c=0;c<8;c++)br.push({x:4+c*44,y:40+r*20,c:cols[r],a:true})};
+  const park=()=>{run=false;bx=px;by=PY-R-1;vx=0;vy=0};
+  const spd=()=>4.2+lvl*.6;
+  const launch=()=>{if(over){init();return}if(!run){run=true;vx=(Math.random()<.5?-1:1)*2;vy=-Math.sqrt(spd()*spd()-4)}};
+  const init=()=>{px=W/2;lives=3;n=0;lvl=0;over=false;setScore(0);msg.textContent='';build();park();cancelAnimationFrame(raf);tick()};
+  const tick=()=>{update();draw();raf=requestAnimationFrame(tick)};
+  offs.push(()=>cancelAnimationFrame(raf));
+  const update=()=>{if(over)return;
+    if(L)px-=6;if(Rt)px+=6;px=Math.max(PW/2,Math.min(W-PW/2,px));
+    if(!run){bx=px;return}
+    bx+=vx;by+=vy;
+    if(bx<R){bx=R;vx=Math.abs(vx)}if(bx>W-R){bx=W-R;vx=-Math.abs(vx)}if(by<R){by=R;vy=Math.abs(vy)}
+    if(vy>0&&by+R>=PY&&by-R<=PY+10&&Math.abs(bx-px)<=PW/2+R){const k=Math.max(-1,Math.min(1,(bx-px)/(PW/2))),s=spd();vx=k*s*.8;vy=-Math.sqrt(Math.max(s*s-vx*vx,4));by=PY-R}
+    for(const b of br){if(b.a&&bx+R>b.x&&bx-R<b.x+40&&by+R>b.y&&by-R<b.y+16){b.a=false;n+=10;setScore(n);
+      const ox=Math.min(bx+R-b.x,b.x+40-(bx-R)),oy=Math.min(by+R-b.y,b.y+16-(by-R));if(ox<oy)vx=-vx;else vy=-vy;break}}
+    if(!br.some(b=>b.a)){lvl++;build();park();return}
+    if(by>H+R){lives--;if(lives<=0){over=true;msg.textContent='Game over. Click, tap or press Space to play again.';submit(n)}else park()}};
+  const draw=()=>{x.fillStyle='#150F2A';x.fillRect(0,0,W,H);
+    br.forEach(b=>{if(b.a){x.fillStyle=b.c;x.fillRect(b.x,b.y,40,16)}});
+    x.fillStyle='#F1ECFF';x.fillRect(px-PW/2,PY,PW,10);
+    x.fillStyle='#F2A900';x.beginPath();x.arc(bx,by,R,0,7);x.fill();
+    x.fillStyle='#F1ECFF';x.font='10px "Press Start 2P",monospace';x.fillText('Lives '+lives+'   Level '+(lvl+1),8,20)};
+  const mv=e=>{px=spot(cv,e)[0]};
+  on(cv,'mousemove',mv);on(cv,'touchmove',e=>{e.preventDefault();mv(e)},{passive:false});
+  on(cv,'touchstart',e=>{mv(e);launch()},{passive:true});on(cv,'click',launch);
+  on(document,'keydown',e=>{if(e.key==='ArrowLeft'||e.key==='a'){L=true;e.preventDefault()}if(e.key==='ArrowRight'||e.key==='d'){Rt=true;e.preventDefault()}if(e.key===' '){e.preventDefault();launch()}});
+  on(document,'keyup',e=>{if(e.key==='ArrowLeft'||e.key==='a')L=false;if(e.key==='ArrowRight'||e.key==='d')Rt=false});
+  init();
+}},
+memory:{name:'Memory Match',icon:'🃏',color:'--c2',low:true,hint:'Flip two cards at a time and find all eight pairs. Fewer moves is a better score.',start(){
+  const em=['🍒','🚀','🐙','🎲','🌵','🍄','🔔','🧩'],deck=[...em,...em].sort(()=>Math.random()-.5);
+  const g=document.createElement('div');g.className='mem';view.innerHTML='';view.appendChild(g);
+  let open=[],moves=0,done=0,lock=false;setScore(0);
+  deck.forEach((e,i)=>{const b=document.createElement('button');b.setAttribute('aria-label','Card '+(i+1));b.onclick=()=>{
+    if(lock||b.classList.contains('up')||b.classList.contains('ok'))return;
+    b.classList.add('up');b.textContent=e;open.push(b);
+    if(open.length==2){moves++;setScore(moves);lock=true;const[a,c]=open;
+      if(a.textContent===c.textContent){a.className=c.className='ok';open=[];lock=false;done++;
+        if(done==8){msg.textContent='Cleared in '+moves+' moves. Press Restart to beat it.';submit(moves)}}
+      else later(()=>{a.className=c.className='';a.textContent=c.textContent='';open=[];lock=false},800)}};
+    g.appendChild(b)});
+}},
+ttt:{name:'Tic-Tac-Toe',icon:'❌',color:'--c4',hint:'You are X and go first. The computer is O and sometimes slips, so wins are possible. Restart for a new round.',start(){
+  const W=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  const win=b=>{for(const[a,c,d]of W)if(b[a]&&b[a]===b[c]&&b[a]===b[d])return b[a];return b.includes('')?null:'-'};
+  const mm=(b,p)=>{const w=win(b);if(w)return w==='O'?1:w==='X'?-1:0;let best=p==='O'?-2:2;
+    b.forEach((v,i)=>{if(!v){b[i]=p;const r=mm(b,p==='O'?'X':'O');b[i]='';best=p==='O'?Math.max(best,r):Math.min(best,r)}});return best};
+  const ai=b=>{const free=b.map((v,i)=>v?-1:i).filter(i=>i>=0);if(Math.random()<.3)return free[rand(free.length)];
+    let bi=free[0],bv=-2;free.forEach(i=>{b[i]='O';const v=mm(b,'X');b[i]='';if(v>bv){bv=v;bi=i}});return bi};
+  const b=Array(9).fill(''),wins=store.get('ttt_run')&&0,g=document.createElement('div');g.className='ttt';view.innerHTML='';view.appendChild(g);
+  let over=false,w=0;setScore(0);
+  const cells=b.map((_,i)=>{const c=document.createElement('button');c.setAttribute('aria-label','Square '+(i+1));c.onclick=()=>{if(over||b[i])return;put(i,'X');
+      if(!over)later(()=>{if(!over)put(ai(b),'O')},350)};g.appendChild(c);return c});
+  const put=(i,p)=>{b[i]=p;cells[i].textContent=p;cells[i].className=p.toLowerCase();const r=win(b);
+    if(r){over=true;if(r==='X'){w++;setScore(w);submit(w);msg.textContent='You win! Restart to go again.'}else msg.textContent=r==='O'?'The computer wins. Restart to try again.':'A draw. Restart to go again.'}};
+}}
+};
+
+$('#cards').innerHTML=Object.entries(G).map(([id,g])=>`<button class="card" data-id="${id}"><div class="top" style="background:var(${g.color})">${g.icon}</div><div class="bd"><b>${g.name}</b><small>Best: <span class="bv" data-id="${id}"></span></small></div></button>`).join('');
+const bests=()=>document.querySelectorAll('.bv').forEach(e=>e.textContent=store.get(e.dataset.id)||'-');
+const play=id=>{clean();cur=G[id];cur.id=id;$('#menu').hidden=true;$('#stage').hidden=false;$('#title').textContent=cur.name;$('#hint').textContent=cur.hint;
+  pad.hidden=id!=='snake';msg.textContent='';setScore(0);bs.textContent=store.get(id)||'-';cur.start()};
+document.querySelectorAll('.card').forEach(c=>c.onclick=()=>play(c.dataset.id));
+$('#again').onclick=()=>play(cur.id);
+$('#back').onclick=()=>{clean();cur=null;$('#stage').hidden=true;$('#menu').hidden=false;bests()};
+pad.onclick=e=>{const d=e.target.closest('button');if(d&&cur&&cur.dir)cur.dir(d.dataset.d)};
+bests();
+</script></body></html>
